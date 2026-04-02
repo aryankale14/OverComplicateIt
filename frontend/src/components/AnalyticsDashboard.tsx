@@ -25,6 +25,7 @@ const AnalyticsDashboard = ({ onBack }: { onBack: () => void }) => {
 
     try {
       const basicAuth = btoa(`${email}:${password}`);
+      // @ts-ignore
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/analytics`, {
         headers: {
           'Authorization': `Basic ${basicAuth}`
