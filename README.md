@@ -1,6 +1,6 @@
 # OverComplicateIt
 
-A full-stack web application that transforms your mundane life updates into buzzword-heavy, highly-engaging (and incredibly cringey) LinkedIn posts. Powered by Google's Gemini-1.5-Flash AI.
+A full-stack web application that transforms your mundane life updates into buzzword-heavy, highly-engaging (and incredibly cringey) LinkedIn posts. 
 
 ## Features
 - **Zero-Shot AI Prompting**: Finely-tuned system instructions to turn any boring event ("I ate toast") into a disruptive startup manifesto.
