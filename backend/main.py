@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import datetime
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,39 +6,27 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from google import genai
 from google.genai import types
+from supabase import create_client, Client
 
 app = FastAPI()
 security = HTTPBasic()
 
-# Enable CORS since frontend runs on a different port (Vite default: 5173)
+# Enable CORS since frontend runs on a different port during local dev
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict to your frontend domain
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-DB_PATH = "analytics.db"
-
-def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS logs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            query TEXT,
-            style TEXT,
-            cringe_level INTEGER,
-            post_length TEXT,
-            timestamp TEXT
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
-# Initialize DB on startup
-init_db()
+def get_supabase() -> Client:
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+    if not supabase_url or not supabase_key:
+        print("Missing Supabase credentials, analytics will be bypassed.")
+        return None
+    return create_client(supabase_url, supabase_key)
 
 class GenerateRequest(BaseModel):
     input: str
@@ -49,15 +36,19 @@ class GenerateRequest(BaseModel):
 
 @app.post("/api/generate")
 async def generate_post(request: GenerateRequest):
-    # Log to sqlite
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO logs (query, style, cringe_level, post_length, timestamp)
-        VALUES (?, ?, ?, ?, ?)
-    ''', (request.input, request.style, request.cringe_level, request.post_length, datetime.datetime.now().isoformat()))
-    conn.commit()
-    conn.close()
+    # Log to Supabase silently
+    try:
+        supabase = get_supabase()
+        if supabase:
+            supabase.table("logs").insert({
+                "query": request.input,
+                "style": request.style,
+                "cringe_level": request.cringe_level,
+                "post_length": request.post_length,
+                "timestamp": datetime.datetime.utcnow().isoformat()
+            }).execute()
+    except Exception as e:
+        print(f"Error logging to Supabase: {e}")
 
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -126,15 +117,17 @@ def get_analytics(credentials: HTTPBasicCredentials = Depends(security)):
             headers={"WWW-Authenticate": "Basic"},
         )
     
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM logs ORDER BY timestamp DESC")
-    rows = cursor.fetchall()
-    conn.close()
-    
-    return {"logs": [dict(row) for row in rows]}
+    supabase = get_supabase()
+    if not supabase:
+        return {"logs": [], "error": "Supabase not configured"}
 
+    try:
+        response = supabase.table("logs").select("*").order("timestamp", desc=True).execute()
+        return {"logs": response.data}
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=f"Error fetching analytics: {str(e)}")
+
+# This ensures uvicorn can be run locally
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
