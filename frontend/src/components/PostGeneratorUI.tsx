@@ -45,6 +45,7 @@ const PostGeneratorUI = ({ onAnalyticsClick }: { onAnalyticsClick?: () => void }
 		setCopied(false);
 
 		try {
+			// @ts-ignore
 			const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || ''}/api/generate`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
