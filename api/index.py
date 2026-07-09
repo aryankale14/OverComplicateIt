@@ -95,7 +95,7 @@ FORMATTING RULES (CRITICAL):
 Generate the LinkedIn post now. Output ONLY the post content. Do not include any introductory or concluding text."""
 
         response = client.models.generate_content(
-            model='gemini-2.5-flash-lite',
+            model='gemini-2.5-flash',
             contents="Now generate the post based on the parameters provided.",
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
